@@ -1,0 +1,17 @@
+# Node
+node_modules/
+dist/
+.wrangler/
+wrangler-dist/
+
+# Rust
+target/
+**/*.rs.bk
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+wrangler.toml.bak

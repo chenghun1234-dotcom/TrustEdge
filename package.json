@@ -1,0 +1,14 @@
+{
+  "name": "trustedge",
+  "version": "1.0.0",
+  "description": "Real-time Attestation API for Genius Act Compliance",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "wasm:build": "cd wasm-core && wasm-pack build --target web"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
