@@ -38,6 +38,11 @@ export default {
       return await handleAuditRequest(request, env, issuerId);
     }
 
+    // API: Admin - List All Issuers Status
+    if (url.pathname === "/api/admin/status") {
+      return await handleAdminStatus(request, env);
+    }
+
     // API: Register New Issuer (Admin only)
     if (url.pathname === "/api/register" && request.method === "POST") {
       return await handleRegisterIssuer(request, env);
@@ -49,8 +54,89 @@ export default {
     }
 
     return new Response("Not Found", { status: 404 });
+  },
+
+  // Cron Trigger: Automatic Periodic Audit
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleScheduledAudits(env));
   }
 };
+
+async function handleScheduledAudits(env) {
+  // 1. Fetch all issuers from KV
+  const issuerListRaw = await env.TRUST_KV.list({ prefix: "issuer:" });
+  
+  for (const key of issuerListRaw.keys) {
+    const issuerId = key.name.split(":")[1];
+    const configRaw = await env.TRUST_KV.get(key.name);
+    if (!configRaw) continue;
+    
+    const config = JSON.parse(configRaw);
+    
+    // 2. Perform Audit
+    try {
+      const [onChainSupply, offChainAssets] = await Promise.all([
+        fetchOnChainSupply(env, config),
+        fetchOffChainAssets(env, config)
+      ]);
+      
+      const ratio = onChainSupply > 0 ? offChainAssets / onChainSupply : 0;
+      
+      // 3. Trigger Alert if Insolvent
+      if (ratio < 1.0) {
+        await sendAlert(env, issuerId, ratio, offChainAssets, onChainSupply);
+      }
+      
+      // 4. Log to D1
+      if (env.DB) {
+        await env.DB.prepare(
+          "INSERT INTO audit_logs (timestamp, assets, liabilities, ratio, proof) VALUES (?, ?, ?, ?, ?)"
+        ).bind(Date.now(), offChainAssets, onChainSupply, ratio, `AUTO-AUDIT-${issuerId}`).run();
+      }
+    } catch (e) {
+      console.error(`Audit failed for ${issuerId}:`, e);
+    }
+  }
+}
+
+async function sendAlert(env, issuerId, ratio, assets, liabilities) {
+  const SLACK_WEBHOOK = env.ALERT_WEBHOOK_URL;
+  if (!SLACK_WEBHOOK) return;
+
+  const message = {
+    text: `🚨 *TRUSTEDGE ALERT: SOLVENCY VIOLATION* 🚨\nIssuer: *${issuerId}*\nRatio: *${(ratio * 100).toFixed(2)}%*\nAssets: $${assets.toLocaleString()}\nLiabilities: $${liabilities.toLocaleString()}\nAction required immediately.`
+  };
+
+  await fetch(SLACK_WEBHOOK, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(message)
+  });
+}
+
+async function handleAdminStatus(request, env) {
+  const issuerListRaw = await env.TRUST_KV.list({ prefix: "issuer:" });
+  const statuses = [];
+
+  for (const key of issuerListRaw.keys) {
+    const issuerId = key.name.split(":")[1];
+    // Get last log from D1 for this issuer
+    const lastLog = env.DB ? await env.DB.prepare(
+      "SELECT * FROM audit_logs WHERE proof LIKE ? ORDER BY timestamp DESC LIMIT 1"
+    ).bind(`%${issuerId}%`).first() : null;
+
+    statuses.push({
+      issuerId,
+      lastVerified: lastLog ? lastLog.timestamp : null,
+      lastRatio: lastLog ? lastLog.ratio : null,
+      isSolvent: lastLog ? lastLog.ratio >= 1.0 : null
+    });
+  }
+
+  return new Response(JSON.stringify(statuses), {
+    headers: { "Content-Type": "application/json" }
+  });
+}
 
 async function handleAuditRequest(request, env, issuerId) {
   try {

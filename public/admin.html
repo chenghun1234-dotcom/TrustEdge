@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrustEdge | Super Admin Panel</title>
+    <link rel="stylesheet" href="index.css">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.372.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    <nav>
+        <div class="logo"><i data-lucide="shield-alert"></i> TrustEdge Admin</div>
+        <a href="index.html" class="btn" style="color: white; text-decoration: none;">Public View</a>
+    </nav>
+
+    <main class="container">
+        <header class="hero">
+            <h1>Global Compliance Monitor</h1>
+            <p>Automatically monitoring all registered issuers via Edge Cron Triggers.</p>
+        </header>
+
+        <section class="main-content">
+            <div class="section-title">
+                <h2>Registered Issuers Status</h2>
+                <button class="btn btn-primary" onclick="loadStatus()">Refresh Status</button>
+            </div>
+
+            <div class="table-container">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <th style="padding: 1rem; color: var(--text-dim);">Issuer ID</th>
+                            <th style="padding: 1rem; color: var(--text-dim);">Last Verified</th>
+                            <th style="padding: 1rem; color: var(--text-dim);">Last Ratio</th>
+                            <th style="padding: 1rem; color: var(--text-dim);">Status</th>
+                            <th style="padding: 1rem; color: var(--text-dim);">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-status-table">
+                        <!-- Loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        async function loadStatus() {
+            const tbody = document.getElementById('admin-status-table');
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 2rem; text-align: center;">Loading global status...</td></tr>';
+
+            try {
+                const response = await fetch('/api/admin/status', {
+                    headers: { 'X-API-Key': 'trustedge-dev-key' }
+                });
+                const data = await response.json();
+
+                tbody.innerHTML = '';
+                data.forEach(issuer => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid var(--border-color)';
+                    
+                    const dateStr = issuer.lastVerified ? new Date(issuer.lastVerified).toLocaleString() : 'Never';
+                    const ratioStr = issuer.lastRatio ? (issuer.lastRatio * 100).toFixed(2) + '%' : 'N/A';
+                    const statusColor = issuer.isSolvent ? 'var(--success)' : (issuer.isSolvent === false ? 'var(--warning)' : 'var(--text-dim)');
+
+                    row.innerHTML = `
+                        <td style="padding: 1rem; font-weight: 600;">${issuer.issuerId}</td>
+                        <td style="padding: 1rem;">${dateStr}</td>
+                        <td style="padding: 1rem;">${ratioStr}</td>
+                        <td style="padding: 1rem;"><span style="color: ${statusColor}; font-weight: 700;">${issuer.isSolvent ? 'SOLVENT' : (issuer.isSolvent === false ? 'VIOLATION' : 'UNKNOWN')}</span></td>
+                        <td style="padding: 1rem;"><button class="btn" onclick="window.location.href='index.html?issuer=${issuer.issuerId}'" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">View Dashboard</button></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="5" style="padding: 2rem; text-align: center; color: var(--warning);">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadStatus);
+    </script>
+</body>
+</html>
