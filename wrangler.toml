@@ -15,9 +15,6 @@ binding = "DB"
 database_name = "trust_db"
 database_id = "f6bb881f-c416-4c95-b22c-2000ee9c1412"
 
-# [[r2_buckets]]
-# binding = "REPORTS"
-# bucket_name = "trust-reports"
 
 [assets]
 directory = "public"
