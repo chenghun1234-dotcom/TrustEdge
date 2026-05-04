@@ -5,18 +5,18 @@ compatibility_date = "2024-05-04"
 [vars]
 ENVIRONMENT = "production"
 
-[[kv_namespaces]]
-binding = "TRUST_KV"
-id = "xxxxxxxxxxxx"
+# [[kv_namespaces]]
+# binding = "TRUST_KV"
+# id = "xxxxxxxxxxxx"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "trust_db"
-database_id = "xxxxxxxxxxxx"
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "trust_db"
+# database_id = "xxxxxxxxxxxx"
 
-[[r2_buckets]]
-binding = "REPORTS"
-bucket_name = "trust-reports"
+# [[r2_buckets]]
+# binding = "REPORTS"
+# bucket_name = "trust-reports"
 
 [assets]
 directory = "public"
