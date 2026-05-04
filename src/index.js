@@ -100,25 +100,69 @@ async function handleAuditRequest(request, env) {
 }
 
 /**
- * Connector: Etherscan On-chain Supply
+ * Connector: Multi-Chain On-chain Supply
  */
 async function fetchOnChainSupply(env) {
-  const ETHERSCAN_API_KEY = env.ETHERSCAN_API_KEY || "YourApiKeyToken";
-  const TOKEN_ADDRESS = env.TOKEN_ADDRESS || "0xdac17f958d2ee523a2206206994597c13d831ec7"; // USDT Example
-  
-  const url = `https://api.etherscan.io/api?module=stats&action=tokensupply&contractaddress=${TOKEN_ADDRESS}&apikey=${ETHERSCAN_API_KEY}`;
-  
-  const response = await fetch(url);
-  const data = await response.json();
-  
-  if (data.status !== "1") {
-    throw new Error(`Etherscan API Error: ${data.message}`);
-  }
-  
-  // Convert from Wei/Smallest unit (assuming 6 decimals for USDT, 18 for others)
-  // In production, decimals should be fetched from the contract
+  const chainType = env.CHAIN_TYPE || "ETH"; // ETH, POLYGON, XRPL, SOL
+  const tokenAddress = env.TOKEN_ADDRESS || "0xdac17f958d2ee523a2206206994597c13d831ec7"; // Default USDT (ETH)
+  const apiKey = env.ETHERSCAN_API_KEY || "YourApiKeyToken";
   const decimals = env.TOKEN_DECIMALS || 6;
-  return parseFloat(data.result) / Math.pow(10, decimals);
+
+  switch (chainType.toUpperCase()) {
+    case "ETH":
+    case "POLYGON": {
+      const baseUrl = chainType === "ETH" 
+        ? "https://api.etherscan.io/api" 
+        : "https://api.polygonscan.com/api";
+      
+      const url = `${baseUrl}?module=stats&action=tokensupply&contractaddress=${tokenAddress}&apikey=${apiKey}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status !== "1") throw new Error(`${chainType} API Error: ${data.message}`);
+      return parseFloat(data.result) / Math.pow(10, decimals);
+    }
+
+    case "XRPL": {
+      // XRPL uses account balance for issued currencies (IOU)
+      const url = "https://xrplcluster.com";
+      const payload = {
+        method: "account_lines",
+        params: [{ account: tokenAddress }] // On XRPL, this would be the issuer account
+      };
+      const response = await fetch(url, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      const lines = data.result.lines || [];
+      // Summing up all balances to get total supply (simplified)
+      const total = lines.reduce((acc, line) => acc + Math.abs(parseFloat(line.balance)), 0);
+      return total;
+    }
+
+    case "SOL": {
+      // Solana JSON-RPC
+      const url = env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+      const payload = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getTokenSupply",
+        params: [tokenAddress]
+      };
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(`Solana API Error: ${data.error.message}`);
+      return parseFloat(data.result.value.uiAmount);
+    }
+
+    default:
+      throw new Error(`Unsupported Chain Type: ${chainType}`);
+  }
 }
 
 /**

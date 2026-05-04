@@ -5,6 +5,10 @@ account_id = "8253b30c0106148cfe2add2a62792196"
 
 [vars]
 ENVIRONMENT = "production"
+CHAIN_TYPE = "ETH" # ETH, POLYGON, XRPL, SOL
+TOKEN_ADDRESS = "0xdac17f958d2ee523a2206206994597c13d831ec7"
+TOKEN_DECIMALS = 6
+SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
 
 [[kv_namespaces]]
 binding = "TRUST_KV"
