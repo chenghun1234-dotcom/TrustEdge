@@ -1,18 +1,19 @@
 name = "trustedge"
 main = "src/index.js"
 compatibility_date = "2024-05-04"
+account_id = "8253b30c0106148cfe2add2a62792196"
 
 [vars]
 ENVIRONMENT = "production"
 
-# [[kv_namespaces]]
-# binding = "TRUST_KV"
-# id = "xxxxxxxxxxxx"
+[[kv_namespaces]]
+binding = "TRUST_KV"
+id = "089a0b1c5027451ca20e38fe6e15ae02"
 
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "trust_db"
-# database_id = "xxxxxxxxxxxx"
+[[d1_databases]]
+binding = "DB"
+database_name = "trust_db"
+database_id = "f6bb881f-c416-4c95-b22c-2000ee9c1412"
 
 # [[r2_buckets]]
 # binding = "REPORTS"
