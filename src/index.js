@@ -33,7 +33,7 @@ export default {
   }
 };
 
-async fn handleAuditRequest(request, env) {
+async function handleAuditRequest(request, env) {
   try {
     // 1. Fetch Real-time Data from Connectors
     const [onChainSupply, offChainAssets] = await Promise.all([
@@ -89,7 +89,7 @@ async fn handleAuditRequest(request, env) {
 /**
  * Connector: Etherscan On-chain Supply
  */
-async fn fetchOnChainSupply(env) {
+async function fetchOnChainSupply(env) {
   const ETHERSCAN_API_KEY = env.ETHERSCAN_API_KEY || "YourApiKeyToken";
   const TOKEN_ADDRESS = env.TOKEN_ADDRESS || "0xdac17f958d2ee523a2206206994597c13d831ec7"; // USDT Example
   
@@ -111,7 +111,7 @@ async fn fetchOnChainSupply(env) {
 /**
  * Connector: Off-chain Bank API (Mock/Generic)
  */
-async fn fetchOffChainAssets(env) {
+async function fetchOffChainAssets(env) {
   const BANK_API_URL = env.BANK_API_URL || "https://mock-bank-api.trustedge.io/v1/balance";
   const BANK_API_KEY = env.BANK_API_KEY;
 
@@ -135,7 +135,7 @@ async fn fetchOffChainAssets(env) {
   }
 }
 
-async fn handleReportRequest(request, env) {
+async function handleReportRequest(request, env) {
   // Generate a monthly PDF/JSON attestation
   const reportId = `TR-ATT-${Date.now()}`;
   const signedPayload = `SIGNED-${reportId}-ETHEREUM-MAINNET`;
