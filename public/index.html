@@ -33,7 +33,19 @@
             <p>Real-time Proof of Reserve (PoR) via Wasm-Edge. Replace expensive audits with deterministic code.</p>
         </header>
 
-        <section class="stats-grid">
+            <div class="stats-grid">
+                <div class="stat-card" style="grid-column: span 2;">
+                    <div class="stat-label">Select Issuer (Tenant)</div>
+                    <select id="issuerSelector" class="btn" style="width: 100%; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-color); text-align: left;" onchange="triggerManualAudit()">
+                        <option value="default">Default Issuer (USDT/ETH)</option>
+                        <option value="issuer_polygon">Polygon Stablecoin (USDC/POL)</option>
+                        <option value="issuer_xrpl">XRPL Gateway (RLUSD/XRPL)</option>
+                        <option value="issuer_solana">Solana Asset (PYUSD/SOL)</option>
+                    </select>
+                </div>
+            </div>
+
+            <section class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">System Status</div>
                 <div class="stat-value"><span class="pulse-dot"></span>Active</div>
@@ -141,15 +153,17 @@
 
         async function triggerManualAudit() {
             const btn = document.querySelector('.btn-primary[onclick="triggerManualAudit()"]');
+            const issuerSelector = document.getElementById('issuerSelector');
+            const issuerId = issuerSelector.value;
             const originalContent = btn.innerHTML;
             
             try {
                 btn.innerHTML = '<i data-lucide="loader-2" class="spin" style="width: 16px; height: 16px; margin-right: 8px; vertical-align: middle;"></i> Syncing...';
                 lucide.createIcons();
                 
-                const response = await fetch('/api/audit', {
+                const response = await fetch(`/api/audit?issuer=${issuerId}`, {
                     headers: {
-                        'X-API-Key': 'trustedge-dev-key' // In prod, this would come from user session/config
+                        'X-API-Key': 'trustedge-dev-key'
                     }
                 });
                 const data = await response.json();

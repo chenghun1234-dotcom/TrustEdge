@@ -34,7 +34,13 @@ export default {
 
     // API: Real-time Audit
     if (url.pathname === "/api/audit") {
-      return await handleAuditRequest(request, env);
+      const issuerId = url.searchParams.get("issuer") || "default";
+      return await handleAuditRequest(request, env, issuerId);
+    }
+
+    // API: Register New Issuer (Admin only)
+    if (url.pathname === "/api/register" && request.method === "POST") {
+      return await handleRegisterIssuer(request, env);
     }
 
     // API: Monthly Attestation Report
@@ -46,39 +52,50 @@ export default {
   }
 };
 
-async function handleAuditRequest(request, env) {
+async function handleAuditRequest(request, env, issuerId) {
   try {
-    // 1. Fetch Real-time Data from Connectors
+    // 1. Fetch Issuer-specific Configuration from KV
+    const configRaw = await env.TRUST_KV.get(`issuer:${issuerId}`);
+    const config = configRaw ? JSON.parse(configRaw) : {
+      chainType: env.CHAIN_TYPE || "ETH",
+      tokenAddress: env.TOKEN_ADDRESS,
+      decimals: env.TOKEN_DECIMALS || 6,
+      bankApiUrl: env.BANK_API_URL,
+      bankApiKey: env.BANK_API_KEY
+    };
+
+    // 2. Fetch Real-time Data from Connectors using dynamic config
     const [onChainSupply, offChainAssets] = await Promise.all([
-      fetchOnChainSupply(env),
-      fetchOffChainAssets(env)
+      fetchOnChainSupply(env, config),
+      fetchOffChainAssets(env, config)
     ]);
 
-    // 2. Proof of Solvency Logic (Wasm-inspired)
+    // 3. Proof of Solvency Logic (Deterministic)
     const assets = parseFloat(offChainAssets);
     const liabilities = parseFloat(onChainSupply);
     const isSolvent = assets >= liabilities;
     const ratio = liabilities > 0 ? assets / liabilities : 0;
     const timestamp = Date.now();
     
-    // Create a deterministic proof hash
     const encoder = new TextEncoder();
-    const data = encoder.encode(`${timestamp}-${assets}-${liabilities}-${isSolvent}`);
+    const data = encoder.encode(`${timestamp}-${assets}-${liabilities}-${isSolvent}-${issuerId}`);
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
     const proofHash = Array.from(new Uint8Array(hashBuffer))
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
 
     const report = {
+      issuerId,
       timestamp,
       assets,
       liabilities,
       solvencyRatio: ratio,
       isSolvent,
-      proofHash: `0x${proofHash}`
+      proofHash: `0x${proofHash}`,
+      config: { chain: config.chainType, token: config.tokenAddress }
     };
 
-    // 3. Persistent Logging (D1)
+    // 4. Persistent Logging (D1)
     if (env.DB) {
       await env.DB.prepare(
         "INSERT INTO audit_logs (timestamp, assets, liabilities, ratio, proof) VALUES (?, ?, ?, ?, ?)"
@@ -86,10 +103,7 @@ async function handleAuditRequest(request, env) {
     }
 
     return new Response(JSON.stringify(report), {
-      headers: { 
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*" 
-      }
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { 
@@ -99,14 +113,34 @@ async function handleAuditRequest(request, env) {
   }
 }
 
+async function handleRegisterIssuer(request, env) {
+  try {
+    const data = await request.json();
+    const { issuerId, chainType, tokenAddress, decimals, bankApiUrl, bankApiKey } = data;
+    
+    if (!issuerId || !chainType || !tokenAddress) {
+      throw new Error("Missing required issuer fields");
+    }
+
+    const config = { chainType, tokenAddress, decimals, bankApiUrl, bankApiKey };
+    await env.TRUST_KV.put(`issuer:${issuerId}`, JSON.stringify(config));
+
+    return new Response(JSON.stringify({ message: "Issuer registered successfully", issuerId }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), { status: 400 });
+  }
+}
+
 /**
  * Connector: Multi-Chain On-chain Supply
  */
-async function fetchOnChainSupply(env) {
-  const chainType = env.CHAIN_TYPE || "ETH"; // ETH, POLYGON, XRPL, SOL
-  const tokenAddress = env.TOKEN_ADDRESS || "0xdac17f958d2ee523a2206206994597c13d831ec7"; // Default USDT (ETH)
-  const apiKey = env.ETHERSCAN_API_KEY || "YourApiKeyToken";
-  const decimals = env.TOKEN_DECIMALS || 6;
+async function fetchOnChainSupply(env, config) {
+  const chainType = config.chainType || "ETH";
+  const tokenAddress = config.tokenAddress;
+  const apiKey = env.ETHERSCAN_API_KEY;
+  const decimals = config.decimals || 6;
 
   switch (chainType.toUpperCase()) {
     case "ETH":
@@ -168,9 +202,9 @@ async function fetchOnChainSupply(env) {
 /**
  * Connector: Off-chain Bank API (Mock/Generic)
  */
-async function fetchOffChainAssets(env) {
-  const BANK_API_URL = env.BANK_API_URL || "https://mock-bank-api.trustedge.io/v1/balance";
-  const BANK_API_KEY = env.BANK_API_KEY;
+async function fetchOffChainAssets(env, config) {
+  const BANK_API_URL = config.bankApiUrl || env.BANK_API_URL || "https://mock-bank-api.trustedge.io/v1/balance";
+  const BANK_API_KEY = config.bankApiKey || env.BANK_API_KEY;
 
   // In a real scenario, this would be a secure request to a bank's treasury API
   // or a Plaid-like aggregator
