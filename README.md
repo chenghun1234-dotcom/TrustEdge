@@ -45,7 +45,14 @@ Set your API keys in `wrangler.toml` or via `wrangler secret`:
 - `BANK_API_URL`: Your off-chain treasury API endpoint.
 - `BANK_API_KEY`: Authentication for the bank API.
 
-### 6. Deployment
+### 6. Security
+To secure your API in production, set an `API_KEY` secret:
+```bash
+npx wrangler secret put API_KEY
+```
+This key must be provided in the `X-API-Key` header for all `/api/*` requests.
+
+### 7. Deployment
 ```bash
 # Initialize D1 Database
 npx wrangler d1 create trust_db

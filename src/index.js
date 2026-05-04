@@ -19,6 +19,19 @@ export default {
       });
     }
 
+    // API Security Check
+    if (url.pathname.startsWith("/api/")) {
+      const apiKey = request.headers.get("X-API-Key");
+      const validKey = env.API_KEY || "trustedge-dev-key"; // Fallback for dev
+      
+      if (!apiKey || apiKey !== validKey) {
+        return new Response(JSON.stringify({ error: "Unauthorized: Invalid API Key" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     // API: Real-time Audit
     if (url.pathname === "/api/audit") {
       return await handleAuditRequest(request, env);
